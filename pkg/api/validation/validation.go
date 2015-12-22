@@ -1285,11 +1285,71 @@ func ValidatePodSpec(spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
+// ValidateNodeSelectorRequirement test that the specified NodeSelectorRequirement fields has valid data
+func ValidateNodeSelectorRequirement(sr api.NodeSelectorRequirement, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	switch sr.Operator {
+	case api.NodeSelectorOpIn, api.NodeSelectorOpNotIn:
+		if len(sr.Values) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("values"), "must be specified when `operator` is 'In' or 'NotIn'"))
+		}
+	case api.NodeSelectorOpExists, api.NodeSelectorOpDoesNotExist:
+		if len(sr.Values) > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("values"), "may not be specified when `operator` is 'Exists' or 'DoesNotExist'"))
+		}
+
+	case api.NodeSelectorOpGt, api.NodeSelectorOpLt:
+		if len(sr.Values) != 1 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("values"), "must be specified single value when `operator` is 'Lt' or 'Gt'"))
+		}
+	default:
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("operator"), sr.Operator, "not a valid selector operator"))
+	}
+	allErrs = append(allErrs, ValidateLabelName(sr.Key, fldPath.Child("key"))...)
+	return allErrs
+}
+
+// ValidateHardNodeAffinity test that the specified HardNodeAffinity fields has valid data
+func validateHardNodeAffinity(hardNodeAffinity *api.NodeSelector, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	for _, nst := range hardNodeAffinity.NodeSelectorTerms {
+		for j, nsr := range nst.MatchExpressions {
+			allErrs = append(allErrs, ValidateNodeSelectorRequirement(nsr, fldPath.Child("matchExpressions").Index(j))...)
+		}
+	}
+
+	return allErrs
+}
+
+// ValidateSoftNodeAffinity test that the specified SoftNodeAffinity fields has valid data
+func validateSoftNodeAffinity(softNodeAffinity []api.SoftNodeAffinityTerm, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	for _, sna := range softNodeAffinity {
+		if sna.Weight <= 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("weight"), sna.Weight, "must be greater than or equal to 0"))
+		}
+		for j, nsr := range sna.MatchExpressions {
+			allErrs = append(allErrs, ValidateNodeSelectorRequirement(nsr, fldPath.Child("matchExpressions").Index(j))...)
+		}
+	}
+	return allErrs
+}
+
 // ValidatePodAffinity test that the specified Affinity field in PocSpec has valid data
 func ValidatePodAffinity(affinity *api.Affinity, specPath, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	// TODO: add fields validation of affinity here.
+	if affinity != nil {
+		if affinity.HardNodeAffinity != nil {
+			allErrs = append(allErrs, validateHardNodeAffinity(affinity.HardNodeAffinity, specPath.Child("hardNodeAffinity"))...)
+		}
+
+		if affinity.SoftNodeAffinity != nil {
+			allErrs = append(allErrs, validateSoftNodeAffinity(affinity.SoftNodeAffinity, specPath.Child("softNodeAffinity"))...)
+		}
+	}
 	return allErrs
 }
 
