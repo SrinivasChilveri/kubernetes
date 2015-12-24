@@ -261,7 +261,7 @@ func PodMatchesNodeLabels(pod *api.Pod, node *api.Node) bool {
 
 		//represents the OR of the selectors represented by the nodeSelectorTerms.
 		for _, req := range pod.Spec.Affinity.HardNodeAffinity.NodeSelectorTerms {
-			nodeSelector, err := api.NodeSelectorRequirementsAsSelector(&req.MatchExpressions)
+			nodeSelector, err := api.NodeSelectorRequirementsAsSelector(req.MatchExpressions)
 			if err != nil {
 				return false
 			}

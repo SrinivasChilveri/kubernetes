@@ -645,6 +645,40 @@ func TestPodFitsSelector(t *testing.T) {
 			fits: true,
 			test: "same labels with  Affinity with zero NodeSelectTerms",
 		},
+		{
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					NodeSelector: map[string]string{
+						"foo": "bar",
+					},
+					Affinity:&api.Affinity{
+						HardNodeAffinity: &api.NodeSelector{NodeSelectorTerms: []api.NodeSelectorTerm{{},{}}},
+					},
+				},
+			},
+			labels: map[string]string{
+				"foo": "bar",
+			},
+			fits: false,
+			test: "same labels with  Affinity with more NodeSelectTerms but with nil MatchExpressions",
+		},
+		{
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					NodeSelector: map[string]string{
+						"foo": "bar",
+					},
+					Affinity:&api.Affinity{
+						HardNodeAffinity: &api.NodeSelector{NodeSelectorTerms: []api.NodeSelectorTerm{{MatchExpressions:[]api.NodeSelectorRequirement{}}}},
+					},
+				},
+			},
+			labels: map[string]string{
+				"foo": "bar",
+			},
+			fits: true,
+			test: "same labels with  Affinity with more NodeSelectTerms but with Zero MatchExpressions",
+		},
 	}
 	for _, test := range tests {
 		node := api.Node{ObjectMeta: api.ObjectMeta{Labels: test.labels}}
