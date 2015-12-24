@@ -192,18 +192,18 @@ func TestNodeSelectorRequirementsAsSelector(t *testing.T) {
 		return out
 	}
 	tc := []struct {
-		in        *[]NodeSelectorRequirement
+		in        []NodeSelectorRequirement
 		out       labels.Selector
 		expectErr bool
 	}{
 		{in: nil, out: labels.Nothing()},
-		{in: &[]NodeSelectorRequirement{}, out: labels.Everything()},
+		{in: []NodeSelectorRequirement{}, out: labels.Everything()},
 		{
-			in:  &matchExpressions,
+			in:  matchExpressions,
 			out: mustParse("foo in (baz,bar)"),
 		},
 		{
-			in: &[]NodeSelectorRequirement{{
+			in: []NodeSelectorRequirement{{
 				Key:      "foo",
 				Operator: NodeSelectorOpExists,
 				Values:   []string{"bar", "baz"},

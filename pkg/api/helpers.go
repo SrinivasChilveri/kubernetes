@@ -266,15 +266,15 @@ func ParseRFC3339(s string, nowFn func() unversioned.Time) (unversioned.Time, er
 
 // NodeSelectorRequirementsAsSelector converts the []NodeSelectorRequirement api type into a struct that implements
 // labels.Selector
-func NodeSelectorRequirementsAsSelector(nsm *[]NodeSelectorRequirement) (labels.Selector, error) {
+func NodeSelectorRequirementsAsSelector(nsm []NodeSelectorRequirement) (labels.Selector, error) {
 	if nsm == nil {
 		return labels.Nothing(), nil
 	}
-	if len(*nsm) == 0 {
+	if len(nsm) == 0 {
 		return labels.Everything(), nil
 	}
 	selector := labels.NewSelector()
-	for _, expr := range *nsm {
+	for _, expr := range nsm {
 		var op labels.Operator
 		switch expr.Operator {
 		case NodeSelectorOpIn:
