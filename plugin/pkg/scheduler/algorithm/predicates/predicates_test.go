@@ -617,7 +617,7 @@ func TestPodFitsSelector(t *testing.T) {
 					NodeSelector: map[string]string{
 						"foo": "bar",
 					},
-					Affinity:&api.Affinity{
+					Affinity: &api.Affinity{
 						HardNodeAffinity: &api.NodeSelector{},
 					},
 				},
@@ -634,7 +634,7 @@ func TestPodFitsSelector(t *testing.T) {
 					NodeSelector: map[string]string{
 						"foo": "bar",
 					},
-					Affinity:&api.Affinity{
+					Affinity: &api.Affinity{
 						HardNodeAffinity: &api.NodeSelector{NodeSelectorTerms: []api.NodeSelectorTerm{}},
 					},
 				},
@@ -651,8 +651,8 @@ func TestPodFitsSelector(t *testing.T) {
 					NodeSelector: map[string]string{
 						"foo": "bar",
 					},
-					Affinity:&api.Affinity{
-						HardNodeAffinity: &api.NodeSelector{NodeSelectorTerms: []api.NodeSelectorTerm{{},{}}},
+					Affinity: &api.Affinity{
+						HardNodeAffinity: &api.NodeSelector{NodeSelectorTerms: []api.NodeSelectorTerm{{}, {}}},
 					},
 				},
 			},
@@ -668,8 +668,8 @@ func TestPodFitsSelector(t *testing.T) {
 					NodeSelector: map[string]string{
 						"foo": "bar",
 					},
-					Affinity:&api.Affinity{
-						HardNodeAffinity: &api.NodeSelector{NodeSelectorTerms: []api.NodeSelectorTerm{{MatchExpressions:[]api.NodeSelectorRequirement{}}}},
+					Affinity: &api.Affinity{
+						HardNodeAffinity: &api.NodeSelector{NodeSelectorTerms: []api.NodeSelectorTerm{{MatchExpressions: []api.NodeSelectorRequirement{}}}},
 					},
 				},
 			},
