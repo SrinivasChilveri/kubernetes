@@ -28,9 +28,9 @@ type NodeAffinity struct {
 	nodeLister algorithm.NodeLister
 }
 
-func NewNodeAffinityPriority(nodeLister1 algorithm.NodeLister) algorithm.PriorityFunction {
+func NewNodeAffinityPriority(nodeLister algorithm.NodeLister) algorithm.PriorityFunction {
 	nodeAffinity := &NodeAffinity{
-		nodeLister: nodeLister1,
+		nodeLister: nodeLister,
 	}
 	return nodeAffinity.CalculateNodeAffinityPriority
 }
@@ -43,17 +43,16 @@ func (s *NodeAffinity) CalculateNodeAffinityPriority(pod *api.Pod, machinesToPod
 	var maxCount int
 	counts := map[string]int{}
 
-	// 1) get nodes which satisfies the HardNodeAffinity of the pod
 	nodes, err := nodeLister.List()
 	if err != nil {
 		return nil, err
 	}
 	if pod.Spec.Affinity != nil && pod.Spec.Affinity.SoftNodeAffinity != nil {
 		for _, node := range nodes.Items {
-			for _, softnodeaffinity := range pod.Spec.Affinity.SoftNodeAffinity {
-				nodeSelector, err := api.NodeSelectorRequirementsAsSelector(softnodeaffinity.MatchExpressions)
+			for _, softNodeAffinityTerm := range pod.Spec.Affinity.SoftNodeAffinity {
+				nodeSelector, err := api.NodeSelectorRequirementsAsSelector(softNodeAffinityTerm.MatchExpressions)
 				if (err == nil) && nodeSelector.Matches(labels.Set(node.Labels)) {
-					counts[node.Name] += softnodeaffinity.Weight
+					counts[node.Name] += softNodeAffinityTerm.Weight
 				}
 				if counts[node.Name] > maxCount {
 					maxCount = counts[node.Name]
