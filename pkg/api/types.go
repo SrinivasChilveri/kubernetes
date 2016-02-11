@@ -1117,6 +1117,10 @@ const (
 type Affinity struct {
 	// Describes node affinity scheduling requirements for the pod.
 	NodeAffinity *NodeAffinity `json:"nodeAffinity,omitempty"`
+	// Describes pod affinity scheduling requirements for the pod.
+	PodAffinity *PodAffinity `json:"podAffinity,omitempty"`
+	// Describes pod anti affinity scheduling requirements for the pod.
+	PodAntiAffinity *PodAntiAffinity `json:"podAntiAffinity,omitempty"`
 }
 
 // Node affinity is a group of node affinity scheduling requirements.
@@ -1157,6 +1161,124 @@ type PreferredSchedulingTerm struct {
 	Preference NodeSelectorTerm `json:"preference"`
 }
 
+// A label selector is a label query over a set of resources. The result of matchLabels and
+// matchExpressions are ANDed. An empty label selector matches all objects. A null
+// label selector matches no objects.
+type LabelSelector struct {
+	// matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+	// map is equivalent to an element of matchExpressions, whose key field is "key", the
+	// operator is "In", and the values array contains only "value". The requirements are ANDed.
+	MatchLabels map[string]string `json:"matchLabels,omitempty"`
+	// matchExpressions is a list of label selector requirements. The requirements are ANDed.
+	MatchExpressions []LabelSelectorRequirement `json:"matchExpressions,omitempty"`
+}
+
+// A label selector requirement is a selector that contains values, a key, and an operator that
+// relates the key and values.
+type LabelSelectorRequirement struct {
+	// key is the label key that the selector applies to.
+	Key string `json:"key" patchStrategy:"merge" patchMergeKey:"key"`
+	// operator represents a key's relationship to a set of values.
+	// Valid operators ard In, NotIn, Exists and DoesNotExist.
+	Operator LabelSelectorOperator `json:"operator"`
+	// values is an array of string values. If the operator is In or NotIn,
+	// the values array must be non-empty. If the operator is Exists or DoesNotExist,
+	// the values array must be empty. This array is replaced during a strategic
+	// merge patch.
+	Values []string `json:"values,omitempty"`
+}
+
+// A label selector operator is the set of operators that can be used in a selector requirement.
+type LabelSelectorOperator string
+
+const (
+	LabelSelectorOpIn           LabelSelectorOperator = "In"
+	LabelSelectorOpNotIn        LabelSelectorOperator = "NotIn"
+	LabelSelectorOpExists       LabelSelectorOperator = "Exists"
+	LabelSelectorOpDoesNotExist LabelSelectorOperator = "DoesNotExist"
+)
+
+// Describes pod affinity scheduling requirements for the pod.
+type PodAffinity struct {
+	// If the affinity requirements specified by this field are not met at
+	// scheduling time, the pod will not be scheduled onto the node.
+	// If the affinity requirements specified by this field cease to be met
+	// at some point during pod execution (e.g. due to a pod label update), the
+	// system will try to eventually evict the pod from its node.
+	// When there are multiple elements, the lists of nodes corresponding to each
+	// podAffinityTerm are intersected, i.e. all terms must be satisfied.
+	RequiredDuringSchedulingRequiredDuringExecution []PodAffinityTerm `json:"requiredDuringSchedulingRequiredDuringExecution,omitempty"`
+	// If the affinity requirements specified by this field are not met at
+	// scheduling time, the pod will not be scheduled onto the node.
+	// If the affinity requirements specified by this field cease to be met
+	// at some point during pod execution (e.g. due to a pod label update), the
+	// system may or may not try to eventually evict the pod from its node.
+	// When there are multiple elements, the lists of nodes corresponding to each
+	// podAffinityTerm are intersected, i.e. all terms must be satisfied.
+	RequiredDuringSchedulingIgnoredDuringExecution []PodAffinityTerm `json:"requiredDuringSchedulingIgnoredDuringExecution,omitempty"`
+	// The scheduler will prefer to schedule pods to nodes that satisfy
+	// the affinity expressions specified by this field, but it may choose
+	// a node that violates one or more of the expressions. The node that is
+	// most preferred is the one with the greatest sum of weights, i.e.
+	// for each node that meets all of the scheduling requirements (resource
+	// request, requiredDuringScheduling affinity expressions, etc.),
+	// compute a sum by iterating through the elements of this field and adding
+	// "weight" to the sum if the node has pods which matches the corresponding podAffinityTerm; the
+	// node(s) with the highest sum are the most preferred.
+	PreferredDuringSchedulingIgnoredDuringExecution []WeightedPodAffinityTerm `json:"preferredDuringSchedulingIgnoredDuringExecution,omitempty"`
+}
+
+// Describes pod anti affinity scheduling requirements for the pod.
+type PodAntiAffinity struct {
+	// If the anti-affinity requirements specified by this field are not met at
+	// scheduling time, the pod will not be scheduled onto the node.
+	// If the anti-affinity requirements specified by this field cease to be met
+	// at some point during pod execution (e.g. due to a pod label update), the
+	// system will try to eventually evict the pod from its node.
+	// When there are multiple elements, the lists of nodes corresponding to each
+	// podAffinityTerm are intersected, i.e. all terms must be satisfied.
+	RequiredDuringSchedulingRequiredDuringExecution []PodAffinityTerm `json:"requiredDuringSchedulingRequiredDuringExecution,omitempty"`
+	// If the anti-affinity requirements specified by this field are not met at
+	// scheduling time, the pod will not be scheduled onto the node.
+	// If the anti-affinity requirements specified by this field cease to be met
+	// at some point during pod execution (e.g. due to a pod label update), the
+	// system may or may not try to eventually evict the pod from its node.
+	// When there are multiple elements, the lists of nodes corresponding to each
+	// podAffinityTerm are intersected, i.e. all terms must be satisfied.
+	RequiredDuringSchedulingIgnoredDuringExecution []PodAffinityTerm `json:"requiredDuringSchedulingIgnoredDuringExecution,omitempty"`
+	// The scheduler will prefer to schedule pods to nodes that satisfy
+	// the anti-affinity expressions specified by this field, but it may choose
+	// a node that violates one or more of the expressions. The node that is
+	// most preferred is the one with the greatest sum of weights, i.e.
+	// for each node that meets all of the scheduling requirements (resource
+	// request, requiredDuringScheduling anti-affinity expressions, etc.),
+	// compute a sum by iterating through the elements of this field and adding
+	// "weight" to the sum if the node has pods which matches the corresponding podAffinityTerm; the
+	// node(s) with the highest sum are the most preferred.
+	PreferredDuringSchedulingIgnoredDuringExecution []WeightedPodAffinityTerm `json:"preferredDuringSchedulingIgnoredDuringExecution,omitempty"`
+}
+
+//The weights of all of the matched WeightedPodAffinityTerms fields are added per-node to find the most preferred node(s)
+type WeightedPodAffinityTerm struct {
+	// weight associated with matching the corresponding podAffinityTerm, in the range 1-100"
+	Weight int `json:"weight"`
+	//a podAffinityTerm, associated with the corresponding weight
+	PodAffinityTerm PodAffinityTerm `json:"podAffinityTerm"`
+}
+
+// podAffinityTerm contains LabelSelector,Namespaces & topology key
+type PodAffinityTerm struct {
+	// A label selector is a label query over a set of resources.
+	LabelSelector *LabelSelector `json:"labelSelector,omitempty"`
+	// namespaces specifies which namespaces the LabelSelector applies to (matches against);
+	// nil list means "this pod's namespace," empty list means "all namespaces"
+	// The json tag here is not "omitempty" since we need to distinguish nil and empty.
+	// See https://golang.org/pkg/encoding/json/#Marshal for more details.
+	Namespaces []Namespace `json:"namespaces"`
+	// empty topology key is interpreted by the scheduler as "all topologies"
+	TopologyKey string `json:"topologyKey,omitempty"`
+}
+
 // PodSpec is a description of a pod
 type PodSpec struct {
 	Volumes []Volume `json:"volumes"`
@@ -1177,6 +1299,9 @@ type PodSpec struct {
 	DNSPolicy DNSPolicy `json:"dnsPolicy,omitempty"`
 	// NodeSelector is a selector which must be true for the pod to fit on a node
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// Affinity is a group of affinity scheduling requirements of the pod, including node affinity and inter pod affinity.
+	Affinity *Affinity `json:"affinity,omitempty"`
 
 	// ServiceAccountName is the name of the ServiceAccount to use to run this pod
 	// The pod will be allowed to use secrets referenced by the ServiceAccount
