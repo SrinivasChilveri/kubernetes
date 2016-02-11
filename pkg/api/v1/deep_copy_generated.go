@@ -73,6 +73,34 @@ func deepCopy_v1_AWSElasticBlockStoreVolumeSource(in AWSElasticBlockStoreVolumeS
 	return nil
 }
 
+func deepCopy_v1_Affinity(in Affinity, out *Affinity, c *conversion.Cloner) error {
+	if in.NodeAffinity != nil {
+		out.NodeAffinity = new(NodeAffinity)
+		if err := deepCopy_v1_NodeAffinity(*in.NodeAffinity, out.NodeAffinity, c); err != nil {
+			return err
+		}
+	} else {
+		out.NodeAffinity = nil
+	}
+	if in.PodAffinity != nil {
+		out.PodAffinity = new(PodAffinity)
+		if err := deepCopy_v1_PodAffinity(*in.PodAffinity, out.PodAffinity, c); err != nil {
+			return err
+		}
+	} else {
+		out.PodAffinity = nil
+	}
+	if in.PodAntiAffinity != nil {
+		out.PodAntiAffinity = new(PodAntiAffinity)
+		if err := deepCopy_v1_PodAntiAffinity(*in.PodAntiAffinity, out.PodAntiAffinity, c); err != nil {
+			return err
+		}
+	} else {
+		out.PodAntiAffinity = nil
+	}
+	return nil
+}
+
 func deepCopy_v1_AzureFileVolumeSource(in AzureFileVolumeSource, out *AzureFileVolumeSource, c *conversion.Cloner) error {
 	out.SecretName = in.SecretName
 	out.ShareName = in.ShareName
@@ -818,6 +846,42 @@ func deepCopy_v1_ISCSIVolumeSource(in ISCSIVolumeSource, out *ISCSIVolumeSource,
 	return nil
 }
 
+func deepCopy_v1_LabelSelector(in LabelSelector, out *LabelSelector, c *conversion.Cloner) error {
+	if in.MatchLabels != nil {
+		out.MatchLabels = make(map[string]string)
+		for key, val := range in.MatchLabels {
+			out.MatchLabels[key] = val
+		}
+	} else {
+		out.MatchLabels = nil
+	}
+	if in.MatchExpressions != nil {
+		out.MatchExpressions = make([]LabelSelectorRequirement, len(in.MatchExpressions))
+		for i := range in.MatchExpressions {
+			if err := deepCopy_v1_LabelSelectorRequirement(in.MatchExpressions[i], &out.MatchExpressions[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.MatchExpressions = nil
+	}
+	return nil
+}
+
+func deepCopy_v1_LabelSelectorRequirement(in LabelSelectorRequirement, out *LabelSelectorRequirement, c *conversion.Cloner) error {
+	out.Key = in.Key
+	out.Operator = in.Operator
+	if in.Values != nil {
+		out.Values = make([]string, len(in.Values))
+		for i := range in.Values {
+			out.Values[i] = in.Values[i]
+		}
+	} else {
+		out.Values = nil
+	}
+	return nil
+}
+
 func deepCopy_v1_Lifecycle(in Lifecycle, out *Lifecycle, c *conversion.Cloner) error {
 	if in.PostStart != nil {
 		out.PostStart = new(Handler)
@@ -1094,6 +1158,36 @@ func deepCopy_v1_NodeAddress(in NodeAddress, out *NodeAddress, c *conversion.Clo
 	return nil
 }
 
+func deepCopy_v1_NodeAffinity(in NodeAffinity, out *NodeAffinity, c *conversion.Cloner) error {
+	if in.RequiredDuringSchedulingRequiredDuringExecution != nil {
+		out.RequiredDuringSchedulingRequiredDuringExecution = new(NodeSelector)
+		if err := deepCopy_v1_NodeSelector(*in.RequiredDuringSchedulingRequiredDuringExecution, out.RequiredDuringSchedulingRequiredDuringExecution, c); err != nil {
+			return err
+		}
+	} else {
+		out.RequiredDuringSchedulingRequiredDuringExecution = nil
+	}
+	if in.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+		out.RequiredDuringSchedulingIgnoredDuringExecution = new(NodeSelector)
+		if err := deepCopy_v1_NodeSelector(*in.RequiredDuringSchedulingIgnoredDuringExecution, out.RequiredDuringSchedulingIgnoredDuringExecution, c); err != nil {
+			return err
+		}
+	} else {
+		out.RequiredDuringSchedulingIgnoredDuringExecution = nil
+	}
+	if in.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+		out.PreferredDuringSchedulingIgnoredDuringExecution = make([]PreferredSchedulingTerm, len(in.PreferredDuringSchedulingIgnoredDuringExecution))
+		for i := range in.PreferredDuringSchedulingIgnoredDuringExecution {
+			if err := deepCopy_v1_PreferredSchedulingTerm(in.PreferredDuringSchedulingIgnoredDuringExecution[i], &out.PreferredDuringSchedulingIgnoredDuringExecution[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.PreferredDuringSchedulingIgnoredDuringExecution = nil
+	}
+	return nil
+}
+
 func deepCopy_v1_NodeCondition(in NodeCondition, out *NodeCondition, c *conversion.Cloner) error {
 	out.Type = in.Type
 	out.Status = in.Status
@@ -1131,6 +1225,48 @@ func deepCopy_v1_NodeList(in NodeList, out *NodeList, c *conversion.Cloner) erro
 		}
 	} else {
 		out.Items = nil
+	}
+	return nil
+}
+
+func deepCopy_v1_NodeSelector(in NodeSelector, out *NodeSelector, c *conversion.Cloner) error {
+	if in.NodeSelectorTerms != nil {
+		out.NodeSelectorTerms = make([]NodeSelectorTerm, len(in.NodeSelectorTerms))
+		for i := range in.NodeSelectorTerms {
+			if err := deepCopy_v1_NodeSelectorTerm(in.NodeSelectorTerms[i], &out.NodeSelectorTerms[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.NodeSelectorTerms = nil
+	}
+	return nil
+}
+
+func deepCopy_v1_NodeSelectorRequirement(in NodeSelectorRequirement, out *NodeSelectorRequirement, c *conversion.Cloner) error {
+	out.Key = in.Key
+	out.Operator = in.Operator
+	if in.Values != nil {
+		out.Values = make([]string, len(in.Values))
+		for i := range in.Values {
+			out.Values[i] = in.Values[i]
+		}
+	} else {
+		out.Values = nil
+	}
+	return nil
+}
+
+func deepCopy_v1_NodeSelectorTerm(in NodeSelectorTerm, out *NodeSelectorTerm, c *conversion.Cloner) error {
+	if in.MatchExpressions != nil {
+		out.MatchExpressions = make([]NodeSelectorRequirement, len(in.MatchExpressions))
+		for i := range in.MatchExpressions {
+			if err := deepCopy_v1_NodeSelectorRequirement(in.MatchExpressions[i], &out.MatchExpressions[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.MatchExpressions = nil
 	}
 	return nil
 }
@@ -1567,6 +1703,97 @@ func deepCopy_v1_Pod(in Pod, out *Pod, c *conversion.Cloner) error {
 	return nil
 }
 
+func deepCopy_v1_PodAffinity(in PodAffinity, out *PodAffinity, c *conversion.Cloner) error {
+	if in.RequiredDuringSchedulingRequiredDuringExecution != nil {
+		out.RequiredDuringSchedulingRequiredDuringExecution = make([]PodAffinityTerm, len(in.RequiredDuringSchedulingRequiredDuringExecution))
+		for i := range in.RequiredDuringSchedulingRequiredDuringExecution {
+			if err := deepCopy_v1_PodAffinityTerm(in.RequiredDuringSchedulingRequiredDuringExecution[i], &out.RequiredDuringSchedulingRequiredDuringExecution[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.RequiredDuringSchedulingRequiredDuringExecution = nil
+	}
+	if in.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+		out.RequiredDuringSchedulingIgnoredDuringExecution = make([]PodAffinityTerm, len(in.RequiredDuringSchedulingIgnoredDuringExecution))
+		for i := range in.RequiredDuringSchedulingIgnoredDuringExecution {
+			if err := deepCopy_v1_PodAffinityTerm(in.RequiredDuringSchedulingIgnoredDuringExecution[i], &out.RequiredDuringSchedulingIgnoredDuringExecution[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.RequiredDuringSchedulingIgnoredDuringExecution = nil
+	}
+	if in.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+		out.PreferredDuringSchedulingIgnoredDuringExecution = make([]WeightedPodAffinityTerm, len(in.PreferredDuringSchedulingIgnoredDuringExecution))
+		for i := range in.PreferredDuringSchedulingIgnoredDuringExecution {
+			if err := deepCopy_v1_WeightedPodAffinityTerm(in.PreferredDuringSchedulingIgnoredDuringExecution[i], &out.PreferredDuringSchedulingIgnoredDuringExecution[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.PreferredDuringSchedulingIgnoredDuringExecution = nil
+	}
+	return nil
+}
+
+func deepCopy_v1_PodAffinityTerm(in PodAffinityTerm, out *PodAffinityTerm, c *conversion.Cloner) error {
+	if in.LabelSelector != nil {
+		out.LabelSelector = new(LabelSelector)
+		if err := deepCopy_v1_LabelSelector(*in.LabelSelector, out.LabelSelector, c); err != nil {
+			return err
+		}
+	} else {
+		out.LabelSelector = nil
+	}
+	if in.Namespaces != nil {
+		out.Namespaces = make([]Namespace, len(in.Namespaces))
+		for i := range in.Namespaces {
+			if err := deepCopy_v1_Namespace(in.Namespaces[i], &out.Namespaces[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Namespaces = nil
+	}
+	out.TopologyKey = in.TopologyKey
+	return nil
+}
+
+func deepCopy_v1_PodAntiAffinity(in PodAntiAffinity, out *PodAntiAffinity, c *conversion.Cloner) error {
+	if in.RequiredDuringSchedulingRequiredDuringExecution != nil {
+		out.RequiredDuringSchedulingRequiredDuringExecution = make([]PodAffinityTerm, len(in.RequiredDuringSchedulingRequiredDuringExecution))
+		for i := range in.RequiredDuringSchedulingRequiredDuringExecution {
+			if err := deepCopy_v1_PodAffinityTerm(in.RequiredDuringSchedulingRequiredDuringExecution[i], &out.RequiredDuringSchedulingRequiredDuringExecution[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.RequiredDuringSchedulingRequiredDuringExecution = nil
+	}
+	if in.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+		out.RequiredDuringSchedulingIgnoredDuringExecution = make([]PodAffinityTerm, len(in.RequiredDuringSchedulingIgnoredDuringExecution))
+		for i := range in.RequiredDuringSchedulingIgnoredDuringExecution {
+			if err := deepCopy_v1_PodAffinityTerm(in.RequiredDuringSchedulingIgnoredDuringExecution[i], &out.RequiredDuringSchedulingIgnoredDuringExecution[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.RequiredDuringSchedulingIgnoredDuringExecution = nil
+	}
+	if in.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+		out.PreferredDuringSchedulingIgnoredDuringExecution = make([]WeightedPodAffinityTerm, len(in.PreferredDuringSchedulingIgnoredDuringExecution))
+		for i := range in.PreferredDuringSchedulingIgnoredDuringExecution {
+			if err := deepCopy_v1_WeightedPodAffinityTerm(in.PreferredDuringSchedulingIgnoredDuringExecution[i], &out.PreferredDuringSchedulingIgnoredDuringExecution[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.PreferredDuringSchedulingIgnoredDuringExecution = nil
+	}
+	return nil
+}
+
 func deepCopy_v1_PodAttachOptions(in PodAttachOptions, out *PodAttachOptions, c *conversion.Cloner) error {
 	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -1759,6 +1986,14 @@ func deepCopy_v1_PodSpec(in PodSpec, out *PodSpec, c *conversion.Cloner) error {
 	} else {
 		out.NodeSelector = nil
 	}
+	if in.Affinity != nil {
+		out.Affinity = new(Affinity)
+		if err := deepCopy_v1_Affinity(*in.Affinity, out.Affinity, c); err != nil {
+			return err
+		}
+	} else {
+		out.Affinity = nil
+	}
 	out.ServiceAccountName = in.ServiceAccountName
 	out.DeprecatedServiceAccount = in.DeprecatedServiceAccount
 	out.NodeName = in.NodeName
@@ -1874,6 +2109,14 @@ func deepCopy_v1_PodTemplateSpec(in PodTemplateSpec, out *PodTemplateSpec, c *co
 		return err
 	}
 	if err := deepCopy_v1_PodSpec(in.Spec, &out.Spec, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_v1_PreferredSchedulingTerm(in PreferredSchedulingTerm, out *PreferredSchedulingTerm, c *conversion.Cloner) error {
+	out.Weight = in.Weight
+	if err := deepCopy_v1_NodeSelectorTerm(in.Preference, &out.Preference, c); err != nil {
 		return err
 	}
 	return nil
@@ -2540,6 +2783,14 @@ func deepCopy_v1_VolumeSource(in VolumeSource, out *VolumeSource, c *conversion.
 	return nil
 }
 
+func deepCopy_v1_WeightedPodAffinityTerm(in WeightedPodAffinityTerm, out *WeightedPodAffinityTerm, c *conversion.Cloner) error {
+	out.Weight = in.Weight
+	if err := deepCopy_v1_PodAffinityTerm(in.PodAffinityTerm, &out.PodAffinityTerm, c); err != nil {
+		return err
+	}
+	return nil
+}
+
 func deepCopy_runtime_RawExtension(in runtime.RawExtension, out *runtime.RawExtension, c *conversion.Cloner) error {
 	if in.RawJSON != nil {
 		out.RawJSON = make([]uint8, len(in.RawJSON))
@@ -2573,6 +2824,7 @@ func init() {
 		deepCopy_unversioned_Time,
 		deepCopy_unversioned_TypeMeta,
 		deepCopy_v1_AWSElasticBlockStoreVolumeSource,
+		deepCopy_v1_Affinity,
 		deepCopy_v1_AzureFileVolumeSource,
 		deepCopy_v1_Binding,
 		deepCopy_v1_Capabilities,
@@ -2620,6 +2872,8 @@ func init() {
 		deepCopy_v1_Handler,
 		deepCopy_v1_HostPathVolumeSource,
 		deepCopy_v1_ISCSIVolumeSource,
+		deepCopy_v1_LabelSelector,
+		deepCopy_v1_LabelSelectorRequirement,
 		deepCopy_v1_Lifecycle,
 		deepCopy_v1_LimitRange,
 		deepCopy_v1_LimitRangeItem,
@@ -2637,9 +2891,13 @@ func init() {
 		deepCopy_v1_NamespaceStatus,
 		deepCopy_v1_Node,
 		deepCopy_v1_NodeAddress,
+		deepCopy_v1_NodeAffinity,
 		deepCopy_v1_NodeCondition,
 		deepCopy_v1_NodeDaemonEndpoints,
 		deepCopy_v1_NodeList,
+		deepCopy_v1_NodeSelector,
+		deepCopy_v1_NodeSelectorRequirement,
+		deepCopy_v1_NodeSelectorTerm,
 		deepCopy_v1_NodeSpec,
 		deepCopy_v1_NodeStatus,
 		deepCopy_v1_NodeSystemInfo,
@@ -2657,6 +2915,9 @@ func init() {
 		deepCopy_v1_PersistentVolumeSpec,
 		deepCopy_v1_PersistentVolumeStatus,
 		deepCopy_v1_Pod,
+		deepCopy_v1_PodAffinity,
+		deepCopy_v1_PodAffinityTerm,
+		deepCopy_v1_PodAntiAffinity,
 		deepCopy_v1_PodAttachOptions,
 		deepCopy_v1_PodCondition,
 		deepCopy_v1_PodExecOptions,
@@ -2670,6 +2931,7 @@ func init() {
 		deepCopy_v1_PodTemplate,
 		deepCopy_v1_PodTemplateList,
 		deepCopy_v1_PodTemplateSpec,
+		deepCopy_v1_PreferredSchedulingTerm,
 		deepCopy_v1_Probe,
 		deepCopy_v1_RBDVolumeSource,
 		deepCopy_v1_RangeAllocation,
@@ -2700,6 +2962,7 @@ func init() {
 		deepCopy_v1_Volume,
 		deepCopy_v1_VolumeMount,
 		deepCopy_v1_VolumeSource,
+		deepCopy_v1_WeightedPodAffinityTerm,
 		deepCopy_runtime_RawExtension,
 		deepCopy_intstr_IntOrString,
 	)

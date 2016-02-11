@@ -20820,7 +20820,7 @@ func (x codecSelfer1234) decSliceDeployment(v *[]Deployment, d *codec1978.Decode
 
 			yyrg1715 := len(yyv1715) > 0
 			yyv21715 := yyv1715
-			yyrl1715, yyrt1715 = z.DecInferLen(yyl1715, z.DecBasicHandle().MaxInitLen, 632)
+			yyrl1715, yyrt1715 = z.DecInferLen(yyl1715, z.DecBasicHandle().MaxInitLen, 640)
 			if yyrt1715 {
 				if yyrl1715 <= cap(yyv1715) {
 					yyv1715 = yyv1715[:yyrl1715]
@@ -20936,7 +20936,7 @@ func (x codecSelfer1234) decSliceDaemonSet(v *[]DaemonSet, d *codec1978.Decoder)
 
 			yyrg1721 := len(yyv1721) > 0
 			yyv21721 := yyv1721
-			yyrl1721, yyrt1721 = z.DecInferLen(yyl1721, z.DecBasicHandle().MaxInitLen, 600)
+			yyrl1721, yyrt1721 = z.DecInferLen(yyl1721, z.DecBasicHandle().MaxInitLen, 608)
 			if yyrt1721 {
 				if yyrl1721 <= cap(yyv1721) {
 					yyv1721 = yyv1721[:yyrl1721]
@@ -21168,7 +21168,7 @@ func (x codecSelfer1234) decSliceJob(v *[]Job, d *codec1978.Decoder) {
 
 			yyrg1733 := len(yyv1733) > 0
 			yyv21733 := yyv1733
-			yyrl1733, yyrt1733 = z.DecInferLen(yyl1733, z.DecBasicHandle().MaxInitLen, 632)
+			yyrl1733, yyrt1733 = z.DecInferLen(yyl1733, z.DecBasicHandle().MaxInitLen, 640)
 			if yyrt1733 {
 				if yyrl1733 <= cap(yyv1733) {
 					yyv1733 = yyv1733[:yyrl1733]

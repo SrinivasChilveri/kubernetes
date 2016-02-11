@@ -40,8 +40,10 @@ func (AWSElasticBlockStoreVolumeSource) SwaggerDoc() map[string]string {
 }
 
 var map_Affinity = map[string]string{
-	"":             "Affinity is a group of affinity scheduling requirements, including node affinity and inter pod affinity.",
-	"nodeAffinity": "Describes node affinity scheduling requirements for the pod.",
+	"":                "Affinity is a group of affinity scheduling requirements, including node affinity and inter pod affinity.",
+	"nodeAffinity":    "Describes node affinity scheduling requirements for the pod.",
+	"podAffinity":     "Describes pod affinity scheduling requirements for the pod.",
+	"podAntiAffinity": "Describes pod anti affinity scheduling requirements for the pod.",
 }
 
 func (Affinity) SwaggerDoc() map[string]string {
@@ -576,6 +578,27 @@ func (ISCSIVolumeSource) SwaggerDoc() map[string]string {
 	return map_ISCSIVolumeSource
 }
 
+var map_LabelSelector = map[string]string{
+	"":                 "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
+	"matchLabels":      "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+	"matchExpressions": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+}
+
+func (LabelSelector) SwaggerDoc() map[string]string {
+	return map_LabelSelector
+}
+
+var map_LabelSelectorRequirement = map[string]string{
+	"":         "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+	"key":      "key is the label key that the selector applies to.",
+	"operator": "operator represents a key's relationship to a set of values. Valid operators ard In, NotIn, Exists and DoesNotExist.",
+	"values":   "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.",
+}
+
+func (LabelSelectorRequirement) SwaggerDoc() map[string]string {
+	return map_LabelSelectorRequirement
+}
+
 var map_Lifecycle = map[string]string{
 	"":          "Lifecycle describes actions that the management system should take in response to container lifecycle events. For the PostStart and PreStop lifecycle handlers, management of the container blocks until the action is complete, unless the container process fails, in which case the handler is aborted.",
 	"postStart": "PostStart is called immediately after a container is created. If the handler fails, the container is terminated and restarted according to its restart policy. Other management of the container blocks until the hook completes. More info: http://releases.k8s.io/HEAD/docs/user-guide/container-environment.md#hook-details",
@@ -1042,6 +1065,39 @@ func (Pod) SwaggerDoc() map[string]string {
 	return map_Pod
 }
 
+var map_PodAffinity = map[string]string{
+	"": "Describes pod affinity scheduling requirements for the pod.",
+	"requiredDuringSchedulingRequiredDuringExecution": "If the affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system will try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied.",
+	"requiredDuringSchedulingIgnoredDuringExecution":  "If the affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system may or may not try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied.",
+	"preferredDuringSchedulingIgnoredDuringExecution": "The scheduler will prefer to schedule pods to nodes that satisfy the affinity expressions specified by this field, but it may choose a node that violates one or more of the expressions. The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the scheduling requirements (resource request, requiredDuringScheduling affinity expressions, etc.), compute a sum by iterating through the elements of this field and adding \"weight\" to the sum if the node has pods which matches the corresponding podAffinityTerm; the node(s) with the highest sum are the most preferred.",
+}
+
+func (PodAffinity) SwaggerDoc() map[string]string {
+	return map_PodAffinity
+}
+
+var map_PodAffinityTerm = map[string]string{
+	"":              "podAffinityTerm contains LabelSelector,Namespaces & topology key",
+	"labelSelector": "A label selector is a label query over a set of resources.",
+	"namespaces":    "namespaces specifies which namespaces the LabelSelector applies to (matches against); nil list means \"this pod's namespace,\" empty list means \"all namespaces\" The json tag here is not \"omitempty\" since we need to distinguish nil and empty. See https://golang.org/pkg/encoding/json/#Marshal for more details.",
+	"topologyKey":   "empty topology key is interpreted by the scheduler as \"all topologies\"",
+}
+
+func (PodAffinityTerm) SwaggerDoc() map[string]string {
+	return map_PodAffinityTerm
+}
+
+var map_PodAntiAffinity = map[string]string{
+	"": "Describes pod anti affinity scheduling requirements for the pod.",
+	"requiredDuringSchedulingRequiredDuringExecution": "If the anti-affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the anti-affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system will try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied.",
+	"requiredDuringSchedulingIgnoredDuringExecution":  "If the anti-affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the anti-affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system may or may not try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied.",
+	"preferredDuringSchedulingIgnoredDuringExecution": "The scheduler will prefer to schedule pods to nodes that satisfy the anti-affinity expressions specified by this field, but it may choose a node that violates one or more of the expressions. The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the scheduling requirements (resource request, requiredDuringScheduling anti-affinity expressions, etc.), compute a sum by iterating through the elements of this field and adding \"weight\" to the sum if the node has pods which matches the corresponding podAffinityTerm; the node(s) with the highest sum are the most preferred.",
+}
+
+func (PodAntiAffinity) SwaggerDoc() map[string]string {
+	return map_PodAntiAffinity
+}
+
 var map_PodAttachOptions = map[string]string{
 	"":          "PodAttachOptions is the query options to a Pod's remote attach call.",
 	"stdin":     "Stdin if true, redirects the standard input stream of the pod for this call. Defaults to false.",
@@ -1140,6 +1196,7 @@ var map_PodSpec = map[string]string{
 	"activeDeadlineSeconds":         "Optional duration in seconds the pod may be active on the node relative to StartTime before the system will actively try to mark it failed and kill associated containers. Value must be a positive integer.",
 	"dnsPolicy":                     "Set DNS policy for containers within the pod. One of 'ClusterFirst' or 'Default'. Defaults to \"ClusterFirst\".",
 	"nodeSelector":                  "NodeSelector is a selector which must be true for the pod to fit on a node. Selector which must match a node's labels for the pod to be scheduled on that node. More info: http://releases.k8s.io/HEAD/docs/user-guide/node-selection/README.md",
+	"affinity":                      "Affinity is a group of affinity scheduling requirements of the pod, including node affinity and inter pod affinity.",
 	"serviceAccountName":            "ServiceAccountName is the name of the ServiceAccount to use to run this pod. More info: http://releases.k8s.io/HEAD/docs/design/service_accounts.md",
 	"serviceAccount":                "DeprecatedServiceAccount is a depreciated alias for ServiceAccountName. Deprecated: Use serviceAccountName instead.",
 	"nodeName":                      "NodeName is a request to schedule this pod onto a specific node. If it is non-empty, the scheduler simply schedules this pod onto that node, assuming that it fits resource requirements.",
@@ -1558,6 +1615,16 @@ var map_VolumeSource = map[string]string{
 
 func (VolumeSource) SwaggerDoc() map[string]string {
 	return map_VolumeSource
+}
+
+var map_WeightedPodAffinityTerm = map[string]string{
+	"":                "The weights of all of the matched WeightedPodAffinityTerms fields are added per-node to find the most preferred node(s)",
+	"weight":          "weight associated with matching the corresponding podAffinityTerm, in the range 1-100\"",
+	"podAffinityTerm": "a podAffinityTerm, associated with the corresponding weight",
+}
+
+func (WeightedPodAffinityTerm) SwaggerDoc() map[string]string {
+	return map_WeightedPodAffinityTerm
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE
