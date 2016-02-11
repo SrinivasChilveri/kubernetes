@@ -1496,6 +1496,18 @@ func TestValidatePodSpec(t *testing.T) {
 	activeDeadlineSeconds := int64(30)
 	minID := int64(0)
 	maxID := int64(2147483647)
+	validLabels := map[string]string{"a": "b"}
+	invalidLabels := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
+	validNameSpaces := []api.Namespace{
+		{
+			ObjectMeta: api.ObjectMeta{Name: "abc", Labels: validLabels},
+		},
+	}
+	invalidNameSpaces := []api.Namespace{
+		{
+			ObjectMeta: api.ObjectMeta{Name: "abc", Labels: invalidLabels},
+		},
+	}
 	successCases := []api.PodSpec{
 		{ // Populate basic fields, leave defaults for most.
 			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
@@ -1516,6 +1528,60 @@ func TestValidatePodSpec(t *testing.T) {
 			DNSPolicy:             api.DNSClusterFirst,
 			ActiveDeadlineSeconds: &activeDeadlineSeconds,
 			ServiceAccountName:    "acct",
+			Affinity: &api.Affinity{
+				PodAffinity: &api.PodAffinity{
+					RequiredDuringSchedulingRequiredDuringExecution: []api.PodAffinityTerm{{
+						LabelSelector: &api.LabelSelector{
+							MatchLabels: validLabels,
+						},
+						Namespaces:  validNameSpaces,
+						TopologyKey: "zone",
+					}},
+					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{{
+						LabelSelector: &api.LabelSelector{
+							MatchLabels: validLabels,
+						},
+						Namespaces:  validNameSpaces,
+						TopologyKey: "zone",
+					}},
+					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{{
+						Weight: 2,
+						PodAffinityTerm: api.PodAffinityTerm{
+							LabelSelector: &api.LabelSelector{
+								MatchLabels: validLabels,
+							},
+							Namespaces:  validNameSpaces,
+							TopologyKey: "zone",
+						},
+					}},
+				},
+				PodAntiAffinity: &api.PodAntiAffinity{
+					RequiredDuringSchedulingRequiredDuringExecution: []api.PodAffinityTerm{{
+						LabelSelector: &api.LabelSelector{
+							MatchLabels: validLabels,
+						},
+						Namespaces:  validNameSpaces,
+						TopologyKey: "node",
+					}},
+					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{{
+						LabelSelector: &api.LabelSelector{
+							MatchLabels: validLabels,
+						},
+						Namespaces:  validNameSpaces,
+						TopologyKey: "node",
+					}},
+					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{{
+						Weight: 2,
+						PodAffinityTerm: api.PodAffinityTerm{
+							LabelSelector: &api.LabelSelector{
+								MatchLabels: validLabels,
+							},
+							Namespaces:  validNameSpaces,
+							TopologyKey: "node",
+						},
+					}},
+				},
+			},
 		},
 		{ // Populate HostNetwork.
 			Containers: []api.Container{
@@ -1700,6 +1766,60 @@ func TestValidatePodSpec(t *testing.T) {
 			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
+		},
+		"bad weight value in weightedPodAffinityTerm of podAffinity": {
+			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
+			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+			Affinity: &api.Affinity{PodAffinity: &api.PodAffinity{
+				PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{{
+					Weight: 0,
+					PodAffinityTerm: api.PodAffinityTerm{
+						LabelSelector: &api.LabelSelector{
+							MatchLabels: validLabels,
+						},
+						Namespaces:  validNameSpaces,
+						TopologyKey: "zone",
+					},
+				}},
+			}},
+		},
+		"bad Namespace in weightedPodAffinityTerm of Podffinity": {
+			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
+			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+			Affinity: &api.Affinity{PodAffinity: &api.PodAffinity{
+				PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{{
+					Weight: 2,
+					PodAffinityTerm: api.PodAffinityTerm{
+						LabelSelector: &api.LabelSelector{
+							MatchLabels: validLabels,
+						},
+						Namespaces:  invalidNameSpaces,
+						TopologyKey: "zone",
+					},
+				}},
+			}},
+		},
+		"bad LableSelector in weightedPodAffinityTerm of Podffinity": {
+			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
+			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+			Affinity: &api.Affinity{PodAffinity: &api.PodAffinity{
+				PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{{
+					Weight: 2,
+					PodAffinityTerm: api.PodAffinityTerm{
+						LabelSelector: &api.LabelSelector{
+							MatchLabels: invalidLabels,
+						},
+						Namespaces:  validNameSpaces,
+						TopologyKey: "zone",
+					},
+				}},
+			}},
 		},
 	}
 	for k, v := range failureCases {

@@ -1330,6 +1330,7 @@ func ValidatePodSpec(spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 	allErrs = append(allErrs, validateRestartPolicy(&spec.RestartPolicy, fldPath.Child("restartPolicy"))...)
 	allErrs = append(allErrs, validateDNSPolicy(&spec.DNSPolicy, fldPath.Child("dnsPolicy"))...)
 	allErrs = append(allErrs, ValidateLabels(spec.NodeSelector, fldPath.Child("nodeSelector"))...)
+	allErrs = append(allErrs, ValidateAffinity(spec.Affinity, fldPath, fldPath.Child("affinity"))...)
 	allErrs = append(allErrs, ValidatePodSecurityContext(spec.SecurityContext, spec, fldPath, fldPath.Child("securityContext"))...)
 	allErrs = append(allErrs, validateImagePullSecrets(spec.ImagePullSecrets, fldPath.Child("imagePullSecrets"))...)
 	if len(spec.ServiceAccountName) > 0 {
@@ -1347,6 +1348,123 @@ func ValidatePodSpec(spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 	if spec.ActiveDeadlineSeconds != nil {
 		if *spec.ActiveDeadlineSeconds <= 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("activeDeadlineSeconds"), spec.ActiveDeadlineSeconds, "must be greater than 0"))
+		}
+	}
+	return allErrs
+}
+
+// ValidateLabelSelectorRequirement tests that the specified LabelSelectorRequirement fields has valid data
+func ValidateLabelSelectorRequirement(sr api.LabelSelectorRequirement, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	switch sr.Operator {
+	case api.LabelSelectorOpIn, api.LabelSelectorOpNotIn:
+		if len(sr.Values) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("values"), "must be specified when `operator` is 'In' or 'NotIn'"))
+		}
+	case api.LabelSelectorOpExists, api.LabelSelectorOpDoesNotExist:
+		if len(sr.Values) > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("values"), "should not be specified when `operator` is 'Exists' or 'DoesNotExist'"))
+		}
+	default:
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("operator"), sr.Operator, "not a valid selector operator"))
+	}
+	allErrs = append(allErrs, ValidateLabelName(sr.Key, fldPath.Child("key"))...)
+	return allErrs
+}
+
+// ValidateLabelSelector tests that the specified LabelSelector fields has valid data
+func ValidateLabelSelector(ps *api.LabelSelector, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if ps == nil {
+		return allErrs
+	}
+	allErrs = append(allErrs, ValidateLabels(ps.MatchLabels, fldPath.Child("matchLabels"))...)
+	for i, expr := range ps.MatchExpressions {
+		allErrs = append(allErrs, ValidateLabelSelectorRequirement(expr, fldPath.Child("matchExpressions").Index(i))...)
+	}
+	return allErrs
+}
+
+// validatePodAffinityTerms tests that the specified podAffinityTerms fields has valid data
+func validatePodAffinityTerms(podAffinityTerms []api.PodAffinityTerm, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	for i, podAffinityTerm := range podAffinityTerms {
+		allErrs = append(allErrs, ValidateLabelSelector(podAffinityTerm.LabelSelector, fldPath.Index(i).Child("matchExpressions"))...)
+
+		for _, namespace := range podAffinityTerm.Namespaces {
+			allErrs = append(allErrs, ValidateNamespace(&namespace)...)
+		}
+		if len(podAffinityTerm.TopologyKey) != 0 {
+			allErrs = append(allErrs, ValidateLabelName(podAffinityTerm.TopologyKey, fldPath.Index(i).Child("topologyKey"))...)
+		}
+	}
+	return allErrs
+}
+
+// validateWeightedPodAffinityTerms tests that the specified weightedPodAffinityTerms fields has valid data
+func validateWeightedPodAffinityTerms(wightedPodAffinityTerms []api.WeightedPodAffinityTerm, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	for j, term := range wightedPodAffinityTerms {
+		if term.Weight <= 0 || term.Weight > 100 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(j).Child("weight"), term.Weight, "must be in the range 1-100"))
+		}
+		var podAffinityTerms []api.PodAffinityTerm
+		podAffinityTerms = append(podAffinityTerms, term.PodAffinityTerm)
+		allErrs = append(allErrs, validatePodAffinityTerms(podAffinityTerms, fldPath.Index(j).Child("podAffinityTerm"))...)
+	}
+	return allErrs
+}
+
+// validatePodAntiAffinity tests that the specified podAntiAffinity fields have valid data
+func validatePodAntiAffinity(podAntiAffinity *api.PodAntiAffinity, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if podAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution != nil {
+		allErrs = append(allErrs, validatePodAffinityTerms(podAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution,
+			fldPath.Child("requiredDuringSchedulingRequiredDuringExecution"))...)
+	}
+	if podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+		allErrs = append(allErrs, validatePodAffinityTerms(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			fldPath.Child("requiredDuringSchedulingIgnoredDuringExecution"))...)
+	}
+	if podAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+		allErrs = append(allErrs, validateWeightedPodAffinityTerms(podAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
+			fldPath.Child("preferredDuringSchedulingIgnoredDuringExecution"))...)
+	}
+	return allErrs
+}
+
+// validatePodAffinity tests that the specified podAffinity fields have valid data
+func validatePodAffinity(podAffinity *api.PodAffinity, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if podAffinity.RequiredDuringSchedulingRequiredDuringExecution != nil {
+		allErrs = append(allErrs, validatePodAffinityTerms(podAffinity.RequiredDuringSchedulingRequiredDuringExecution,
+			fldPath.Child("requiredDuringSchedulingRequiredDuringExecution"))...)
+	}
+	if podAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+		allErrs = append(allErrs, validatePodAffinityTerms(podAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			fldPath.Child("requiredDuringSchedulingIgnoredDuringExecution"))...)
+	}
+	if podAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+		allErrs = append(allErrs, validateWeightedPodAffinityTerms(podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
+			fldPath.Child("preferredDuringSchedulingIgnoredDuringExecution"))...)
+	}
+	return allErrs
+}
+
+// ValidateAffinity tests that the specified Affinity field in PodSpec has valid data
+func ValidateAffinity(affinity *api.Affinity, specPath, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if affinity != nil {
+		if affinity.PodAffinity != nil {
+			allErrs = append(allErrs, validatePodAffinity(affinity.PodAffinity, specPath.Child("podAffinity"))...)
+		}
+		if affinity.PodAntiAffinity != nil {
+			allErrs = append(allErrs, validatePodAntiAffinity(affinity.PodAntiAffinity, specPath.Child("podAntiAffinity"))...)
 		}
 	}
 	return allErrs
