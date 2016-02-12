@@ -297,3 +297,62 @@ func TestGetAffinityFromPod(t *testing.T) {
 		}
 	}
 }
+
+func TestLabelSelectorAsSelector(t *testing.T) {
+	matchLabels := map[string]string{"foo": "bar"}
+	matchExpressions := []LabelSelectorRequirement{{
+		Key:      "baz",
+		Operator: LabelSelectorOpIn,
+		Values:   []string{"qux", "norf"},
+	}}
+	mustParse := func(s string) labels.Selector {
+		out, e := labels.Parse(s)
+		if e != nil {
+			panic(e)
+		}
+		return out
+	}
+	tc := []struct {
+		in        *LabelSelector
+		out       labels.Selector
+		expectErr bool
+	}{
+		{in: nil, out: labels.Nothing()},
+		{in: &LabelSelector{}, out: labels.Everything()},
+		{
+			in:  &LabelSelector{MatchLabels: matchLabels},
+			out: mustParse("foo in (bar)"),
+		},
+		{
+			in:  &LabelSelector{MatchExpressions: matchExpressions},
+			out: mustParse("baz in (norf,qux)"),
+		},
+		{
+			in:  &LabelSelector{MatchLabels: matchLabels, MatchExpressions: matchExpressions},
+			out: mustParse("foo in (bar),baz in (norf,qux)"),
+		},
+		{
+			in: &LabelSelector{
+				MatchExpressions: []LabelSelectorRequirement{{
+					Key:      "baz",
+					Operator: LabelSelectorOpExists,
+					Values:   []string{"qux", "norf"},
+				}},
+			},
+			expectErr: true,
+		},
+	}
+
+	for i, tc := range tc {
+		out, err := LabelSelectorAsSelector(tc.in)
+		if err == nil && tc.expectErr {
+			t.Errorf("[%v]expected error but got none.", i)
+		}
+		if err != nil && !tc.expectErr {
+			t.Errorf("[%v]did not expect error but got: %v", i, err)
+		}
+		if !reflect.DeepEqual(out, tc.out) {
+			t.Errorf("[%v]expected:\n\t%v\nbut got:\n\t%v", i, tc.out, out)
+		}
+	}
+}
