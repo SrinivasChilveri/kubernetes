@@ -1407,3 +1407,280 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 		}
 	}
 }
+func TestInterPodAffinity(t *testing.T) {
+
+	podlabel := map[string]string{"service": "securityscan"}
+	labelselector1 := api.LabelSelector{
+		MatchExpressions: []api.LabelSelectorRequirement{
+			{
+				Key:      "service",
+				Operator: api.LabelSelectorOpIn,
+				Values:   []string{"securityscan"},
+			},
+		},
+	}
+	labelselector2 := api.LabelSelector{
+		MatchExpressions: []api.LabelSelectorRequirement{
+			{
+				Key:      "service",
+				Operator: api.LabelSelectorOpIn,
+				Values:   []string{"antivirusscan"},
+			},
+		},
+	}
+	labelselector3 := api.LabelSelector{
+		MatchExpressions: []api.LabelSelectorRequirement{
+			{
+				Key:      "service",
+				Operator: api.LabelSelectorOpExists,
+			},
+			{
+				Key:      "wrongkey",
+				Operator: api.LabelSelectorOpDoesNotExist,
+			},
+		},
+	}
+	labelselector4 := api.LabelSelector{
+		MatchExpressions: []api.LabelSelectorRequirement{
+			{
+				Key:      "service",
+				Operator: api.LabelSelectorOpIn,
+				Values:   []string{"securityscan"},
+			},
+			{
+				Key:      "service",
+				Operator: api.LabelSelectorOpNotIn,
+				Values:   []string{"wrongvalue"},
+			},
+		},
+	}
+	labels1 := map[string]string{
+		"region": "r1",
+		"zone":   "z11",
+	}
+	node1 := api.Node{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: labels1}}
+
+	tests := []struct {
+		pod  *api.Pod
+		pods []*api.Pod
+		node api.Node
+		fits bool
+		test string
+	}{
+		{
+			pod:  new(api.Pod),
+			node: node1,
+			fits: true,
+			test: "A pod that has no required pod affinity scheduling requirements can schedule onto a node with no existing pods",
+		},
+		{
+			pod: &api.Pod{
+				Spec: api.PodSpec{NodeName: "machine1",
+					Affinity: &api.Affinity{PodAffinity: &api.PodAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{{
+							LabelSelector: &api.LabelSelector{
+								MatchLabels: podlabel,
+							},
+							TopologyKey: "region",
+						},
+						}}},
+				},
+				ObjectMeta: api.ObjectMeta{Labels: podlabel},
+			},
+			pods: []*api.Pod{{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: podlabel}}},
+			node: node1,
+			fits: true,
+			test: "satisfies the requiredDuringSchedulingIgnoredDuringExecution of PodAffinity with matchExpressions as selector",
+		},
+		{
+			pod: &api.Pod{Spec: api.PodSpec{NodeName: "machine1",
+				Affinity: &api.Affinity{PodAffinity: &api.PodAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{{
+						LabelSelector: &labelselector1,
+						TopologyKey:   "region",
+					},
+					}}}},
+				ObjectMeta: api.ObjectMeta{Labels: podlabel}},
+			pods: []*api.Pod{{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: podlabel}}},
+			node: node1,
+			fits: true,
+			test: "satisfies the requiredDuringSchedulingIgnoredDuringExecution of PodAffinity with labelselector",
+		},
+		{
+			pod: &api.Pod{Spec: api.PodSpec{NodeName: "machine1", Affinity: &api.Affinity{
+				PodAffinity: &api.PodAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{{
+						LabelSelector: &labelselector3,
+						TopologyKey:   "region",
+					}},
+					RequiredDuringSchedulingRequiredDuringExecution: []api.PodAffinityTerm{{
+						LabelSelector: &labelselector4,
+						TopologyKey:   "region",
+					}},
+				}}},
+				ObjectMeta: api.ObjectMeta{Labels: podlabel}},
+			pods: []*api.Pod{{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: podlabel}}},
+			node: node1,
+			fits: true,
+			test: "satisfies the PodAffinity with RequiredDuringSchedulingIgnoredDuringExecution and" +
+				"RequiredDuringSchedulingRequiredDuringExecution with different Label Operators",
+		},
+		{
+			pod: &api.Pod{Spec: api.PodSpec{NodeName: "machine1",
+				Affinity: &api.Affinity{PodAffinity: &api.PodAffinity{
+					RequiredDuringSchedulingRequiredDuringExecution: []api.PodAffinityTerm{{
+						LabelSelector: &labelselector1,
+					},
+					}}}},
+				ObjectMeta: api.ObjectMeta{Labels: podlabel}},
+			pods: []*api.Pod{{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: podlabel}}},
+			node: node1,
+			fits: true,
+			test: "satisfies the requiredDuringSchedulingRequiredDuringExecution of PodAffinity with labelselector with empty topologykey",
+		},
+		{
+			pod: &api.Pod{Spec: api.PodSpec{NodeName: "machine1",
+				Affinity: &api.Affinity{PodAffinity: &api.PodAffinity{
+					RequiredDuringSchedulingRequiredDuringExecution: []api.PodAffinityTerm{{
+						LabelSelector: &labelselector1,
+						TopologyKey:   "wrongtopologykey",
+					}},
+				}}},
+				ObjectMeta: api.ObjectMeta{Labels: podlabel}},
+			pods: []*api.Pod{{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: podlabel}}},
+			node: node1,
+			fits: false,
+			test: "Does not satisfy the PodAffinity with labelselector because the node doesn't have corresponding topology key",
+		},
+		{
+			pod: &api.Pod{Spec: api.PodSpec{NodeName: "machine1",
+				Affinity: &api.Affinity{PodAffinity: &api.PodAffinity{
+					RequiredDuringSchedulingRequiredDuringExecution: []api.PodAffinityTerm{{
+						LabelSelector: &labelselector1,
+						Namespaces: []api.Namespace{{
+							ObjectMeta: api.ObjectMeta{Namespace: "DiffNameSpace"},
+						}},
+					}},
+				}}},
+				ObjectMeta: api.ObjectMeta{Labels: podlabel}},
+			pods: []*api.Pod{{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: podlabel}}},
+			node: node1,
+			fits: false,
+			test: "Does not satisfy the PodAffinity with labelselector because of diff Namespace",
+		},
+		{
+			pod: &api.Pod{Spec: api.PodSpec{NodeName: "machine1",
+				Affinity: &api.Affinity{PodAffinity: &api.PodAffinity{
+					RequiredDuringSchedulingRequiredDuringExecution: []api.PodAffinityTerm{{
+						LabelSelector: &labelselector2,
+						TopologyKey:   "region",
+					}},
+				}}},
+				ObjectMeta: api.ObjectMeta{Labels: podlabel}},
+			pods: []*api.Pod{{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: podlabel}}},
+			node: node1,
+			fits: false,
+			test: "Doesn't satisfy the PodAffinity because of wrong labelselector",
+		},
+		{
+			pod: &api.Pod{Spec: api.PodSpec{NodeName: "machine1", Affinity: &api.Affinity{
+				PodAffinity: &api.PodAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{{
+						LabelSelector: &labelselector1,
+						TopologyKey:   "region",
+					}},
+				},
+				PodAntiAffinity: &api.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{{
+						LabelSelector: &labelselector2,
+						TopologyKey:   "node",
+					}},
+				}}},
+				ObjectMeta: api.ObjectMeta{Labels: podlabel}},
+			pods: []*api.Pod{{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: podlabel}}},
+			node: node1,
+			fits: true,
+			test: "satisfies the PodAffinity and PodAntiAffinity with labelselector",
+		},
+		{
+			pod: &api.Pod{Spec: api.PodSpec{NodeName: "machine1", Affinity: &api.Affinity{
+				PodAffinity: &api.PodAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{{
+						LabelSelector: &labelselector1,
+						TopologyKey:   "region",
+					}},
+				},
+				PodAntiAffinity: &api.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{{
+						LabelSelector: &labelselector2,
+						TopologyKey:   "node",
+					}},
+				}}},
+				ObjectMeta: api.ObjectMeta{Labels: podlabel}},
+			pods: []*api.Pod{{Spec: api.PodSpec{NodeName: "machine1",
+				Affinity: &api.Affinity{PodAntiAffinity: &api.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{{
+						LabelSelector: &labelselector2,
+						TopologyKey:   "node",
+					}},
+				}}},
+				ObjectMeta: api.ObjectMeta{Labels: podlabel}}},
+			node: node1,
+			fits: true,
+			test: "satisfies the PodAffinity and PodAntiAffinity and PodAntiAffinity symmetry with labelselector",
+		},
+		{
+			pod: &api.Pod{Spec: api.PodSpec{NodeName: "machine1", Affinity: &api.Affinity{
+				PodAffinity: &api.PodAffinity{RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{{
+					LabelSelector: &labelselector1,
+					TopologyKey:   "region",
+				}},
+				},
+				PodAntiAffinity: &api.PodAntiAffinity{RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{{
+					LabelSelector: &labelselector1,
+					TopologyKey:   "",
+				}},
+				}}}, ObjectMeta: api.ObjectMeta{Labels: podlabel}},
+			pods: []*api.Pod{{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: podlabel}}},
+			node: node1,
+			fits: false,
+			test: "satisfies the PodAffinity but doesn't satisfies the PodAntiAffinity with labelselector",
+		},
+		{
+			pod: &api.Pod{Spec: api.PodSpec{NodeName: "machine1", Affinity: &api.Affinity{
+				PodAffinity: &api.PodAffinity{RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{{
+					LabelSelector: &labelselector1,
+					TopologyKey:   "region",
+				}},
+				},
+				PodAntiAffinity: &api.PodAntiAffinity{RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{{
+					LabelSelector: &labelselector2,
+					TopologyKey:   "node",
+				}},
+				}}},
+				ObjectMeta: api.ObjectMeta{Labels: podlabel}},
+			pods: []*api.Pod{{Spec: api.PodSpec{NodeName: "machine1", Affinity: &api.Affinity{
+				PodAntiAffinity: &api.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{{
+						LabelSelector: &labelselector1,
+						TopologyKey:   "",
+					}},
+				}}}, ObjectMeta: api.ObjectMeta{Labels: podlabel}}},
+			node: node1,
+			fits: false,
+			test: "satisfies the PodAffinity and PodAntiAffinity but doesn't satisfies PodAntiAffinity symmetry with labelselector",
+		},
+	}
+	for _, test := range tests {
+		node := test.node
+
+		fit := NodeSelector{FakeNodeInfo(node)}
+		fits, err := fit.InterPodAffinitySelectorMatches(test.pod, test.node.Name, schedulercache.NewNodeInfo(test.pods...))
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if fits != test.fits {
+			t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
+		}
+	}
+}

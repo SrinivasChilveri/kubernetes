@@ -127,6 +127,14 @@ func defaultPredicates() sets.String {
 				return predicates.NewMaxPDVolumeCountPredicate(predicates.GCEPDVolumeFilter, maxVols, args.PVInfo, args.PVCInfo)
 			},
 		),
+
+		// Fit is determined by inter-pod affinity.
+		factory.RegisterFitPredicateFactory(
+			"MatchInterPodAffinity",
+			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
+				return predicates.NewInterPodSelectorMatchPredicate(args.NodeInfo)
+			},
+		),
 	)
 }
 
