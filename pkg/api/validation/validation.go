@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	unversionedvalidation "k8s.io/kubernetes/pkg/api/unversioned/validation"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -1459,6 +1460,78 @@ func ValidatePreferredSchedulingTerms(terms []api.PreferredSchedulingTerm, fldPa
 	return allErrs
 }
 
+// validatePodAffinityTerm tests that the specified podAffinityTerm fields have valid data
+func validatePodAffinityTerm(podAffinityTerm api.PodAffinityTerm, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(podAffinityTerm.LabelSelector, fldPath.Child("matchExpressions"))...)
+	for _, namespace := range podAffinityTerm.Namespaces {
+		allErrs = append(allErrs, ValidateNamespace(&namespace)...)
+	}
+	if len(podAffinityTerm.TopologyKey) != 0 {
+		allErrs = append(allErrs, ValidateLabelName(podAffinityTerm.TopologyKey, fldPath.Child("topologyKey"))...)
+	}
+	return allErrs
+}
+
+// validatePodAffinityTerms tests that the specified podAffinityTerms fields have valid data
+func validatePodAffinityTerms(podAffinityTerms []api.PodAffinityTerm, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for i, podAffinityTerm := range podAffinityTerms {
+		allErrs = append(allErrs, validatePodAffinityTerm(podAffinityTerm, fldPath.Index(i))...)
+	}
+	return allErrs
+}
+
+// validateWeightedPodAffinityTerms tests that the specified weightedPodAffinityTerms fields have valid data
+func validateWeightedPodAffinityTerms(weightedPodAffinityTerms []api.WeightedPodAffinityTerm, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for j, weightedTerm := range weightedPodAffinityTerms {
+		if weightedTerm.Weight <= 0 || weightedTerm.Weight > 100 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(j).Child("weight"), weightedTerm.Weight, "must be in the range 1-100"))
+		}
+		allErrs = append(allErrs, validatePodAffinityTerm(weightedTerm.PodAffinityTerm, fldPath.Index(j).Child("podAffinityTerm"))...)
+	}
+	return allErrs
+}
+
+// validatePodAntiAffinity tests that the specified podAntiAffinity fields have valid data
+func validatePodAntiAffinity(podAntiAffinity *api.PodAntiAffinity, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// TODO:Uncomment below code once RequiredDuringSchedulingRequiredDuringExecution is implemented.
+	// if podAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution != nil {
+	//	allErrs = append(allErrs, validatePodAffinityTerms(podAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution,
+	//		fldPath.Child("requiredDuringSchedulingRequiredDuringExecution"))...)
+	//}
+	if podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+		allErrs = append(allErrs, validatePodAffinityTerms(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			fldPath.Child("requiredDuringSchedulingIgnoredDuringExecution"))...)
+	}
+	if podAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+		allErrs = append(allErrs, validateWeightedPodAffinityTerms(podAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
+			fldPath.Child("preferredDuringSchedulingIgnoredDuringExecution"))...)
+	}
+	return allErrs
+}
+
+// validatePodAffinity tests that the specified podAffinity fields have valid data
+func validatePodAffinity(podAffinity *api.PodAffinity, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// TODO:Uncomment below code once RequiredDuringSchedulingRequiredDuringExecution is implemented.
+	// if podAffinity.RequiredDuringSchedulingRequiredDuringExecution != nil {
+	//	allErrs = append(allErrs, validatePodAffinityTerms(podAffinity.RequiredDuringSchedulingRequiredDuringExecution,
+	//		fldPath.Child("requiredDuringSchedulingRequiredDuringExecution"))...)
+	//}
+	if podAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+		allErrs = append(allErrs, validatePodAffinityTerms(podAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			fldPath.Child("requiredDuringSchedulingIgnoredDuringExecution"))...)
+	}
+	if podAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+		allErrs = append(allErrs, validateWeightedPodAffinityTerms(podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
+			fldPath.Child("preferredDuringSchedulingIgnoredDuringExecution"))...)
+	}
+	return allErrs
+}
+
 // ValidateAffinityInPodAnnotations tests that the serialized Affinity in Pod.Annotations has valid data
 func ValidateAffinityInPodAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -1485,6 +1558,12 @@ func ValidateAffinityInPodAnnotations(annotations map[string]string, fldPath *fi
 			allErrs = append(allErrs, ValidatePreferredSchedulingTerms(na.PreferredDuringSchedulingIgnoredDuringExecution, fldPath.Child("preferredDuringSchedulingIgnoredDuringExecution"))...)
 
 		}
+	}
+	if affinity.PodAffinity != nil {
+		allErrs = append(allErrs, validatePodAffinity(affinity.PodAffinity, fldPath.Child("podAffinity"))...)
+	}
+	if affinity.PodAntiAffinity != nil {
+		allErrs = append(allErrs, validatePodAntiAffinity(affinity.PodAntiAffinity, fldPath.Child("podAntiAffinity"))...)
 	}
 
 	return allErrs
