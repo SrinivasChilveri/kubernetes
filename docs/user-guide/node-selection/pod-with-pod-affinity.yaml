@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: with-newlabels
+  annotations:
+    scheduler.alpha.kubernetes.io/affinity: >
+      {
+        "podAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": [
+                    {
+                        "labelSelector": {
+                            "matchExpressions": [
+                            {
+                                "key": "security",
+                                "operator": "In",
+                                "values":["S1"]
+                            }
+                         ]
+                        },
+                        "topologyKey": "kubernetes.io/hostname",
+                           "namespaces":[
+                           {
+                              "metadata": {
+                                   "name": "kube-system"
+                                }
+                          }
+                       ]
+                    }
+                ]
+            },
+         "podAntiAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": [
+                    {
+                        "labelSelector": {
+                            "matchExpressions": [{
+                                "key": "security",
+                                "operator": "In",
+                                "values":["S2"]
+                            }]
+                        },
+                        "topologyKey": "kubernetes.io/e2e-region-hostname"
+                    }
+                ]
+            }
+      }
+    another-annotation-key: another-annotation-value
+spec:
+  containers:
+  - name: with-newlabels
+    image: gcr.io/google_containers/pause:2.0
+
