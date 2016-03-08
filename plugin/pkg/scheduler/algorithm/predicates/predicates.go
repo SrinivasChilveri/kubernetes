@@ -23,7 +23,9 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 
 	"github.com/golang/glog"
@@ -734,4 +736,200 @@ func haveSame(a1, a2 []string) bool {
 		}
 	}
 	return false
+}
+
+type InterPodNodeSelector struct {
+	info      NodeInfo
+	podLister algorithm.PodLister
+}
+
+func NewInterPodSelectorMatchPredicate(info NodeInfo, podLister algorithm.PodLister) algorithm.FitPredicate {
+	selector := &InterPodNodeSelector{
+		info:      info,
+		podLister: podLister,
+	}
+	return selector.InterPodAffinitySelectorMatches
+}
+
+func (n *InterPodNodeSelector) InterPodAffinitySelectorMatches(pod *api.Pod, nodeName string, nodeInfo *schedulercache.NodeInfo) (bool, error) {
+	node, err := n.info.GetNodeInfo(nodeName)
+	if err != nil {
+		return false, err
+	}
+	allPods, err := n.podLister.List(labels.Everything())
+	if err != nil {
+		return false, err
+	}
+	return interPodMatchesPodLabels(pod, nodeInfo.Pods(), node, allPods), nil
+}
+
+// checkAnyPodThatMatchPodAffinityTerm first filters the given pods by given namespaces from podAffinityTerm
+// then returns true if any filtered pod matches the given podAffinityTerm
+func checkAnyPodThatMatchPodAffinityTerm(pod *api.Pod, existingPods []*api.Pod, node *api.Node, podAffinityTerm api.PodAffinityTerm) (bool, error) {
+	labelSelector, err := unversioned.LabelSelectorAsSelector(podAffinityTerm.LabelSelector)
+	if err != nil {
+		return false, err
+	}
+	// filter the pods based on namespaces from podAffinityTerm
+	// if the NameSpaces is nil considers the given pod's namespace
+	// if the Namespaces is empty list then considers all the name spaces
+	names := sets.String{}
+	if podAffinityTerm.Namespaces == nil {
+		names.Insert(pod.Namespace)
+	} else if len(podAffinityTerm.Namespaces) != 0 {
+		for _, nameSpace := range podAffinityTerm.Namespaces {
+			names.Insert(nameSpace.Name)
+		}
+	}
+	filteredPods := priorityutil.FilterPodsByNameSpaces(names, existingPods)
+	// return true if any pod matches the podAffinityTerm
+	for _, filteredPod := range filteredPods {
+		if labelSelector.Matches(labels.Set(filteredPod.Labels)) {
+			return priorityutil.CheckTopologyKey(podAffinityTerm.TopologyKey, node), nil
+		}
+	}
+	return false, nil
+}
+
+// If node has pods which satisfy all the required pod affinity scheduling requirements then return true.
+// Checks whether the given node has pods which satisfy both requiredDuringSchedulingRequiredDuringExecution
+// and requiredDuringSchedulingIgnoredDuringExecution
+func checkFeasibilityForHardPodAffinity(pod *api.Pod, existingPods []*api.Pod, node *api.Node, allPods []*api.Pod, podAffinity *api.PodAffinity) bool {
+	var podAffinityTerms []api.PodAffinityTerm
+	if len(podAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
+		podAffinityTerms = podAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+	}
+	// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
+	//if len(podAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
+	//	podAffinityTerms = append(podAffinityTerms, podAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
+	//}
+
+	// for each element podAffinityTerm of podAffinityTerms
+	// considered both requiredDuringSchedulingRequiredDuringExecution and requiredDuringSchedulingIgnoredDuringExecution
+	for _, podAffinityTerm := range podAffinityTerms {
+		// If the RequiredDuringScheduling affinity requirement matches a pod's own labels, and there are no other such pods
+		// anywhere, then disregard the requirement.
+		labelSelector, err := unversioned.LabelSelectorAsSelector(podAffinityTerm.LabelSelector)
+		if err != nil {
+			glog.V(10).Infof("LabelSelectorAsSelector is Failed for podAffinityTerm %+v, err: %+v", podAffinityTerm, err)
+			return false
+		}
+		// the Affinity is to put the pod together with other pods from its same service or RC
+		if labelSelector.Matches(labels.Set(pod.Labels)) {
+
+			// filter the pods based on namespaces from podAffinityTerm
+			// if the NameSpaces is nil considers the given pod's namespace
+			// if the Namespaces is empty list then considers all the name spaces
+			names := sets.String{}
+			if podAffinityTerm.Namespaces == nil {
+				names.Insert(pod.Namespace)
+			} else if len(podAffinityTerm.Namespaces) != 0 {
+				for _, nameSpace := range podAffinityTerm.Namespaces {
+					names.Insert(nameSpace.Name)
+				}
+			}
+			filteredPods := priorityutil.FilterPodsByNameSpaces(names, allPods)
+			for _, filteredPod := range filteredPods {
+				// found an existing pod from same service or RC
+				if labelSelector.Matches(labels.Set(filteredPod.Labels)) {
+					return false
+				}
+			}
+		}
+		podAffinityTermMatches, err := checkAnyPodThatMatchPodAffinityTerm(pod, existingPods, node, podAffinityTerm)
+		// if err or podAffinityTerm match failed then return false otherwise continue
+		if err != nil || podAffinityTermMatches == false {
+			glog.V(10).Infof("Cannot schedule pod %+v onto node %v, because not all the existing pods on this node satisfy the PodAffinityTerm %v err: %v",
+				podName(pod), node.Name, podAffinityTerm, err)
+			return false
+		}
+	}
+	// all the required pod affinity scheduling requirements satisfied
+	glog.V(10).Infof("All the required pod affinity scheduling requirements are satisfied for Pod %+v, on node %v", podName(pod), node.Name)
+	return true
+}
+
+// If node has pods which satisfy all the required pod anti-affinity scheduling requirements then return true
+// checks if the given node has pods that satisfy both requiredDuringSchedulingRequiredDuringExecution
+// and requiredDuringSchedulingIgnoredDuringExecution
+// checks the symmetry for podAntiAffinity
+func checkFeasibilityForHardPodAntiAffinity(pod *api.Pod, existingPods []*api.Pod, node *api.Node, podAntiAffinity *api.PodAntiAffinity) bool {
+	var podAntiAffinityTerms []api.PodAffinityTerm
+	if len(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
+		podAntiAffinityTerms = podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+	}
+	// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
+	//if len(podAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
+	//	podAntiAffinityTerms = append(podAntiAffinityTerms, podAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
+	//}
+	// foreach element podAffinityTerm of podAntiAffinityTerms
+	// considered both requiredDuringSchedulingRequiredDuringExecution and requiredDuringSchedulingIgnoredDuringExecution
+	for _, podAntiAffinityTerm := range podAntiAffinityTerms {
+		podAntiAffinityTermMatches, err := checkAnyPodThatMatchPodAffinityTerm(pod, existingPods, node, podAntiAffinityTerm)
+		// if err or podAntiAffinityTerm match passes then return false otherwise continue
+		if err != nil || podAntiAffinityTermMatches == true {
+			glog.V(10).Infof("Cannot schedule pod %+v onto node %v, because not all the existing pods on this node satisfy the PodAntiAffinityTerm %v,err: %v",
+				podName(pod), node.Name, podAntiAffinityTerm, err)
+			return false
+		}
+	}
+
+	// create list of pods by using the input pod for symmetry check
+	podsForSymmetryChecking := []*api.Pod{pod}
+
+	// for each pod which is running on this node
+	// for each element podAntiAffinityTerm of podAntiAffinityTerms
+	// considered both requiredDuringSchedulingRequiredDuringExecution and requiredDuringSchedulingIgnoredDuringExecution
+	for _, existingPod := range existingPods {
+		affinity, err := api.GetAffinityFromPodAnnotations(existingPod.Annotations)
+		if err != nil {
+			glog.V(10).Infof("Failed to get Affinity from Pod %+v, err: %+v", podName(pod), err)
+			return false
+		}
+		if affinity.PodAntiAffinity != nil {
+			var podSymmetryAntiAffinityTerms []api.PodAffinityTerm
+			if len(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
+				podSymmetryAntiAffinityTerms = affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+			}
+			// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
+			//if len(affinity.PodAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
+			//	podSymmetryAntiAffinityTerms = append(podSymmetryAntiAffinityTerms, affinity.PodAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
+			//}
+			// symmetry validation for hard requirements of PodAntiAffinity
+			// if the new pod would cause any violation of existing pods' PodAntiAffinity rules, return false
+			for _, podSymAntiAffinityTerm := range podSymmetryAntiAffinityTerms {
+				podSymAntiAffinityTermMatches, err := checkAnyPodThatMatchPodAffinityTerm(existingPod, podsForSymmetryChecking, node, podSymAntiAffinityTerm)
+				// if err or podAffinity match passes then return false otherwise continue
+				if err != nil || podSymAntiAffinityTermMatches == true {
+					glog.V(10).Infof("Cannot schedule Pod %+v, onto node %v because the pod does not satisfy the PodAntiAffinityTerm%+v,of existing pod %+v,err: %v",
+						podName(pod), node.Name, podSymAntiAffinityTerm, podName(existingPod), err)
+					return false
+				}
+			}
+		}
+	}
+	// all the required pod anti-affinity scheduling requirements are satisfied
+	glog.V(10).Infof("Can schedule Pod %+v, on node %v because all the required pod anti-affinity scheduling requirements are satisfied", podName(pod), node.Name)
+	return true
+}
+
+func interPodMatchesPodLabels(pod *api.Pod, existingPods []*api.Pod, node *api.Node, allPods []*api.Pod) bool {
+	// Parse required affinity scheduling requirements
+	// and check if the current node match the inter-pod affinity scheduling requirements.
+	affinity, err := api.GetAffinityFromPodAnnotations(pod.Annotations)
+	if err != nil {
+		glog.V(10).Infof("Failed to get Affinity from Pod %+v, err: %+v", podName(pod), err)
+		return false
+	}
+	affinityMatches := true
+	// pod affinity logic for a pod you are scheduling
+	if affinity.PodAffinity != nil {
+		affinityMatches = checkFeasibilityForHardPodAffinity(pod, existingPods, node, allPods, affinity.PodAffinity)
+	}
+	antiAffinityMatches := true
+	// pod anti affinity logic for a pod you are scheduling
+	if affinityMatches && affinity.PodAntiAffinity != nil {
+		antiAffinityMatches = checkFeasibilityForHardPodAntiAffinity(pod, existingPods, node, affinity.PodAntiAffinity)
+	}
+	return affinityMatches && antiAffinityMatches
 }

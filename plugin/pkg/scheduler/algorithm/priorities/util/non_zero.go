@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import "k8s.io/kubernetes/pkg/api"
+import "k8s.io/kubernetes/pkg/util/sets"
 
 // For each of these resources, a pod that doesn't request the resource explicitly
 // will be treated as having requested the amount indicated below, for the purpose
@@ -47,4 +48,29 @@ func GetNonzeroRequests(requests *api.ResourceList) (int64, int64) {
 		outMemory = requests.Memory().Value()
 	}
 	return outMilliCPU, outMemory
+}
+
+// FilterPodsByNameSpaces filters the pods based the given list of namespaces
+func FilterPodsByNameSpaces(names sets.String, pods []*api.Pod) []*api.Pod {
+	if len(pods) == 0 || len(names) == 0 {
+		return pods
+	}
+	result := []*api.Pod{}
+	for _, pod := range pods {
+		if names.Has(pod.Namespace) {
+			result = append(result, pod)
+		}
+	}
+	return result
+}
+
+// CheckTopologyKey returns true if topology key is empty or
+// if node label has proper value with given topologykey as lable key otherwise returns false
+func CheckTopologyKey(topologyKey string, node *api.Node) bool {
+	if len(topologyKey) == 0 {
+		return true
+	} else if node.Labels != nil && len(node.Labels[topologyKey]) > 0 {
+		return true
+	}
+	return false
 }
